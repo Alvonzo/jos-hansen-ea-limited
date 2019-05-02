@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <report
+        id="action_report_customerstatment"
+        string="Customer Statement"
+        model="res.partner"
+        report_type="qweb-pdf"
+        name="biztech_customer_ageing_report.report_customerstatement"
+        file="biztech_customer_ageing_report.report_customerstatement"
+        menu="False"
+    />
+
+    <template id="customer_stmt_asset_backend" inherit_id="account.assets_backend" name="Customer Stmt assets frontend">
+        <xpath expr="." position="inside">
+            <link href="/biztech_customer_ageing_report/static/src/css/style.css" rel="stylesheet" type="text/css"/>
+        </xpath>
+    </template>
+</odoo>

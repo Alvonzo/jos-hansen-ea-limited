@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+    <template id="report_partner_stmt">
+        <t t-call="web.external_layout">
+            <div class="page">
+                <div class="oe_structure"/>
+                <div class="text-center">
+                <h2>Statement of Account</h2></div>
+                <div class="mt64"/>
+                <t t-set="partner" t-value="doc"/>
+                <table class="table" width="100%">
+                    <tr>
+                    <td  border="0" >
+                        <span t-esc="partner"
+                        t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/></td>
+                    <td border="0" >
+                    <span><strong>As of <t t-esc="docs[partner]['as_of']" ></t></strong></span><br/>
+                    <span><strong>Credit Term </strong><t t-esc="docs[partner]['payment_term']" ></t></span>
+                    </td>
+                    </tr>
+                </table>
+                <t t-if="docs[partner]['no_data']">
+                    <h3><span class="mt32" t-esc="docs[partner]['no_data']"/></h3>
+                </t>
+                <t t-if="docs[partner]['invoice_data']">
+                    <table class="table table-sm o_main_table mt32" border="1">
+                        <thead>
+                            <tr>
+                                <th class="text-left">Description</th>
+                                <th class="text-right">Due Date</th>
+                                <th class="text-right">Invoice #</th>
+                                <!-- <th class="text-right">Invoice Amt.</th>
+                                <th class="text-right">Payment Amt.</th>
+                                <th class="text-right">Balance Due.</th> -->
+                                <th class="text-right">Debit</th>
+                                <th class="text-right">Credit</th>
+                                <th class="text-right">Running Balance</th>
+                            </tr>
+                        </thead>
+                        <tbody class="ageing_tbody">
+                            <t t-foreach="docs[partner]['invoice_data']" t-as="invoice_data">
+                            <tr>
+                            <td class="text-left"><span t-esc="invoice_data['description']"/></td>
+                            <td class="text-right"><span t-esc="invoice_data['due_date']"/></td>
+                            <td class="text-right"><span t-esc="invoice_data['invoice_no']"/></td>
+                            <!-- <td class="text-right"><span t-esc="invoice_data['invoice_amount']"/></td>
+                            <td class="text-right"><span t-esc="invoice_data['payment_amount']"/></td>
+                            <td class="text-right"><span t-esc="invoice_data['due_payment']"/></td> -->
+                            <td class="text-right"><span t-esc="'%.2f' % invoice_data['debit']"/></td>
+                            <td class="text-right"><span t-esc="'%.2f' % invoice_data['credit']"/></td>
+                            <td class="text-right"><span t-esc="'%.2f' % invoice_data['running_bal']"/></td>
+                            </tr>
+                            </t>
+                            <tr>
+                                <td colspan="3" class="total-amt text-right"><strong>Sub-Total:</strong></td>
+                                <!-- <td class="total-amt text-right"><span t-esc="docs[partner]['total_amt']"/></td>
+                                <td class="total-amt text-right"><span t-esc="docs[partner]['total_payment']"/></td>
+                                <td class="total-amt text-right"><span t-esc="docs[partner]['total_due']"/></td> -->
+                                 <td class="total-amt text-right"><span t-esc="'%.2f' % docs[partner]['total_debit']"/></td>
+                                <td class="total-amt text-right"><span t-esc="'%.2f' % docs[partner]['total_credit']"/></td>
+                                <td class="total-amt text-right"><span t-esc="'%.2f' % docs[partner]['total_running_bal']"/></td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </t>
+                <t t-if="docs[partner]['period_data'] and docs[partner]['invoice_data']">
+                    <table class="table table-bordered mt64" border="1">
+                        <tr>
+                            <t t-foreach="docs[partner]['period_data']" t-as="period">
+                                <td class="text-center"><strong><span t-esc="period['date']"/></strong></td>
+                            </t>
+                        </tr>
+                        <tr>
+                            <t t-foreach="docs[partner]['period_data']" t-as="period">
+                                <td class="text-center"><strong><span t-esc="'%.2f' % period['amount']"/></strong></td>
+                            </t>
+                        </tr>
+                    </table>
+                </t>
+            </div>
+        </t>
+    </template>
+
+    <template id="report_customerstatement">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="biztech_customer_ageing_report.report_partner_stmt" t-lang="doc.lang">
+                </t>
+            </t>
+        </t>
+    </template>
+</odoo>
