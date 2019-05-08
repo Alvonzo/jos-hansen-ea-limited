@@ -26,6 +26,8 @@
                     <table class="table table-sm o_main_table mt32" border="1">
                         <thead>
                             <tr>
+			        <th class="text-left">Move ID</th>
+			        <th class="text-left">Invoice ID</th>
                                 <th class="text-left">Description</th>
                                 <th class="text-right">Due Date</th>
                                 <th class="text-right">Invoice #</th>
@@ -40,6 +42,8 @@
                         <tbody class="ageing_tbody">
                             <t t-foreach="docs[partner]['invoice_data']" t-as="invoice_data">
                             <tr>
+			    <td class="text-left"><span t-esc="invoice_data['move_id']"/></td>
+			    <td class="text-left"><span t-esc="invoice_data['invoice_id']"/></td>
                             <td class="text-left"><span t-esc="invoice_data['description']"/></td>
                             <td class="text-right"><span t-esc="invoice_data['due_date']"/></td>
                             <td class="text-right"><span t-esc="invoice_data['invoice_no']"/></td>

@@ -72,6 +72,8 @@ class ReportCustomerStatement(models.AbstractModel):
                     if move.credit:
                         running_bal -= move.credit
                     invoice_data.append({
+                        'move_id': move.id,
+                        'invoice_id': invoice.id,
                         'description': invoice.name,
                         'due_date': invoice.date_due and invoice.date_due.strftime('%d-%m-%Y') or '',
                         'invoice_no': invoice.number,
