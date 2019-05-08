@@ -35,7 +35,6 @@ class ReportCustomerStatement(models.AbstractModel):
         partners = header_lines = payable_lines = []
         partners = self.env['res.partner'].browse(list(data['partner_ids']))
         invoice_obj = self.env['account.invoice']
-        move_line_obj = self.env['account.move.line']
         final_data = []
         partner_dict = {}
         order_field = False
@@ -60,37 +59,36 @@ class ReportCustomerStatement(models.AbstractModel):
             period_data, min_date = self.create_period_dict(data['month'], period_data)
             running_bal = 0
             for invoice in invoices.filtered(lambda x:x.residual > 0):
-                move_lines = move_line_obj.search([('ref', '=', invoice.reference), ('full_reconcile_id', '=', False), ('account_id', '=', invoice.account_id.id)], order='id')
                 payment_amount = sum(payment.amount for payment in invoice.payment_ids)
                 invoice_month = self.get_invoice_month(invoice, order_field)
                 period_month = [period['month'] for period in period_data]
                 min_period = min([period['date'] for period in period_data])
                 total_amt = total_payment = total_due = 0
-                for move in move_lines:
-                    if move.debit:
-                        running_bal += move.debit
-                    if move.credit:
-                        running_bal -= move.credit
-                    invoice_data.append({
-                        'move_id': move.id,
-                        'invoice_id': invoice.id,
-                        'description': invoice.name,
-                        'due_date': invoice.date_due and invoice.date_due.strftime('%d-%m-%Y') or '',
-                        'invoice_no': invoice.number,
-                        'invoice_amount': invoice.amount_total,
-                        'payment_amount': payment_amount,
-                        'due_payment': invoice.residual,
-                        'credit': round(move.credit, 2),
-                        'debit': round(move.debit, 2),
-                        'running_bal': round(running_bal, 2),
-                    })
-                    partner_dict[partner].update({
-                        'total_amt': partner_dict[partner]['total_amt'] + invoice.amount_total,
-                        'total_payment': partner_dict[partner]['total_payment'] + payment_amount,
-                        'total_due': partner_dict[partner]['total_due'] + invoice.residual,
-                        'total_debit': round(partner_dict[partner]['total_debit'] + move.debit, 2),
-                        'total_credit': round(partner_dict[partner]['total_credit'] + move.credit, 2),
-                        'total_running_bal': round(running_bal, 2)})
+                debit = credit = 0
+                if invoice.type == 'out_invoice':
+                    debit = invoice.residual
+                    running_bal += invoice.residual
+                elif invoice.type == 'out_refund':
+                    credit = invoice.residual
+                    running_bal -= invoice.residual
+                invoice_data.append({
+                    'description': invoice.name,
+                    'due_date': invoice.date_due and invoice.date_due.strftime('%d-%m-%Y') or '',
+                    'invoice_no': invoice.number,
+                    'invoice_amount': invoice.amount_total,
+                    'payment_amount': payment_amount,
+                    'due_payment': invoice.residual,
+                    'credit': round(credit, 2),
+                    'debit': round(debit, 2),
+                    'running_bal': round(running_bal, 2),
+                })
+                partner_dict[partner].update({
+                    'total_amt': partner_dict[partner]['total_amt'] + invoice.amount_total,
+                    'total_payment': partner_dict[partner]['total_payment'] + payment_amount,
+                    'total_due': partner_dict[partner]['total_due'] + invoice.residual,
+                    'total_debit': round(partner_dict[partner]['total_debit'] + debit, 2),
+                    'total_credit': round(partner_dict[partner]['total_credit'] + credit, 2),
+                    'total_running_bal': round(running_bal, 2)})
                 for period in period_data:
                     if period['month'] == current_month:
                         period['date'] = 'Current'
