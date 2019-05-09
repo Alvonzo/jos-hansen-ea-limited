@@ -94,11 +94,17 @@ class ReportCustomerStatement(models.AbstractModel):
                         period['date'] = 'Current'
                     if invoice_month in period_month:
                         if period['month'] == invoice_month:
-                            period['amount'] += invoice.residual
+                            if invoice.type == 'out_invoice':
+                                period['amount'] += invoice.residual
+                            elif invoice.type == 'out_refund':
+                                period['amount'] -= invoice.residual
                         if period['month'] == 'current' and invoice_month == current_month:
                             period['amount'] = round(running_bal, 2)
                     elif period['date'] == min_date:
-                        period['amount'] += invoice.residual
+                        if invoice.type == 'out_invoice':
+                            period['amount'] += invoice.residual
+                        elif invoice.type == 'out_refund':
+                            period['amount'] -= invoice.residual
             if not invoice_data:
                 partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
             partner_dict[partner].update({'invoice_data': invoice_data, 'period_data': period_data})
