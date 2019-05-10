@@ -58,11 +58,12 @@ class ReportCustomerStatement(models.AbstractModel):
             period_data = [{'month': 'current', 'date': 'Total Outstanding', 'amount': 0.0}]
             period_data, min_date = self.create_period_dict(data['month'], period_data)
             running_bal = 0
+            period_month = [period['month'] for period in period_data]
+            min_period = min([period['date'] for period in period_data])
+            payments = self.env['account.payment'].search([('partner_id', '=', partner.id), ('state', '=', 'posted'), ('invoice_ids', '=', False), ('payment_type', '=', 'inbound')])
             for invoice in invoices.filtered(lambda x:x.residual > 0):
                 payment_amount = sum(payment.amount for payment in invoice.payment_ids)
                 invoice_month = self.get_invoice_month(invoice, order_field)
-                period_month = [period['month'] for period in period_data]
-                min_period = min([period['date'] for period in period_data])
                 total_amt = total_payment = total_due = 0
                 debit = credit = 0
                 if invoice.type == 'out_invoice':
@@ -73,19 +74,13 @@ class ReportCustomerStatement(models.AbstractModel):
                     running_bal -= invoice.residual
                 invoice_data.append({
                     'description': invoice.name,
-                    'due_date': invoice.date_due and invoice.date_due.strftime('%d-%m-%Y') or '',
+                    'due_date': invoice.date_due,
                     'invoice_no': invoice.number,
-                    'invoice_amount': invoice.amount_total,
-                    'payment_amount': payment_amount,
-                    'due_payment': invoice.residual,
                     'credit': round(credit, 2),
                     'debit': round(debit, 2),
                     'running_bal': round(running_bal, 2),
                 })
                 partner_dict[partner].update({
-                    'total_amt': partner_dict[partner]['total_amt'] + invoice.amount_total,
-                    'total_payment': partner_dict[partner]['total_payment'] + payment_amount,
-                    'total_due': partner_dict[partner]['total_due'] + invoice.residual,
                     'total_debit': round(partner_dict[partner]['total_debit'] + debit, 2),
                     'total_credit': round(partner_dict[partner]['total_credit'] + credit, 2),
                     'total_running_bal': round(running_bal, 2)})
@@ -105,7 +100,33 @@ class ReportCustomerStatement(models.AbstractModel):
                             period['amount'] += invoice.residual
                         elif invoice.type == 'out_refund':
                             period['amount'] -= invoice.residual
+            for pay in payments:
+                running_bal -= pay.amount
+                invoice_month = datetime.strptime(str(pay.payment_date), '%Y-%m-%d').month
+                invoice_data.append({
+                    'description': pay.name,
+                    'due_date': pay.payment_date,
+                    'invoice_no': 'Customer Payment',
+                    'credit': round(pay.amount, 2),
+                    'debit': round(0, 2),
+                    'running_bal': round(running_bal, 2),
+                })
+                for period in period_data:
+                    if period['month'] == current_month:
+                        period['date'] = 'Current'
+                    if invoice_month in period_month:
+                        if period['month'] == invoice_month:
+                            period['amount'] -= pay.amount
+                        if period['month'] == 'current' and invoice_month == current_month:
+                            period['amount'] = round(running_bal, 2)
+                    elif period['date'] == min_date:
+                        period['amount'] -= pay.amount
+                partner_dict[partner].update({
+                    'total_debit': round(partner_dict[partner]['total_debit'], 2),
+                    'total_credit': round(partner_dict[partner]['total_credit'] + pay.amount, 2),
+                    'total_running_bal': round(running_bal, 2)})
             if not invoice_data:
                 partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
+            invoice_data = sorted(invoice_data, key=lambda i: i['due_date'])
             partner_dict[partner].update({'invoice_data': invoice_data, 'period_data': period_data})
         return {'docs': partner_dict}
