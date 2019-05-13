@@ -35,6 +35,7 @@ class ReportCustomerStatement(models.AbstractModel):
         partners = header_lines = payable_lines = []
         partners = self.env['res.partner'].browse(list(data['partner_ids']))
         invoice_obj = self.env['account.invoice']
+        move_line_obj = self.env['account.move.line']
         final_data = []
         partner_dict = {}
         order_field = False
@@ -100,15 +101,19 @@ class ReportCustomerStatement(models.AbstractModel):
                             period['amount'] += invoice.residual
                         elif invoice.type == 'out_refund':
                             period['amount'] -= invoice.residual
-            for pay in payments.filtered(lambda x:len(x.invoice_ids) == 0):
-                running_bal -= pay.amount
-                invoice_month = datetime.strptime(str(pay.payment_date), '%Y-%m-%d').month
+            
+            # for pay in payments.filtered(lambda x:len(x.invoice_ids) == 0):self.partner_id.property_account_receivable_id.id
+            self._cr.execute('''select id from account_move_line where id in %s and account_id = %s and full_reconcile_id is null'''%(tuple(payments.mapped('move_line_ids').ids),partner.property_account_receivable_id.id))
+            moves = self._cr.dictfetchall()
+            for pay in move_line_obj.browse([line['id'] for line in moves]):
+                running_bal -= pay.credit
+                invoice_month = datetime.strptime(str(pay.date_maturity), '%Y-%m-%d').month
                 invoice_data.append({
-                    'description': pay.name,
-                    'due_date': pay.payment_date,
-                    'invoice_no': 'Customer Payment',
-                    'credit': round(pay.amount, 2),
-                    'debit': round(0, 2),
+                    'description': '',
+                    'due_date': pay.date_maturity,
+                    'invoice_no': pay.name,
+                    'credit': round(pay.credit, 2),
+                    'debit': round(pay.debit, 2),
                     'running_bal': round(running_bal, 2),
                 })
                 for period in period_data:
@@ -116,14 +121,14 @@ class ReportCustomerStatement(models.AbstractModel):
                         period['date'] = 'Current'
                     if invoice_month in period_month:
                         if period['month'] == invoice_month:
-                            period['amount'] -= pay.amount
+                            period['amount'] -= pay.credit
                         if period['month'] == 'current' and invoice_month == current_month:
                             period['amount'] = round(running_bal, 2)
                     elif period['date'] == min_date:
-                        period['amount'] -= pay.amount
+                        period['amount'] -= pay.credit
                 partner_dict[partner].update({
                     'total_debit': round(partner_dict[partner]['total_debit'], 2),
-                    'total_credit': round(partner_dict[partner]['total_credit'] + pay.amount, 2),
+                    'total_credit': round(partner_dict[partner]['total_credit'] + pay.credit, 2),
                     'total_running_bal': round(running_bal, 2)})
             if not invoice_data:
                 partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
