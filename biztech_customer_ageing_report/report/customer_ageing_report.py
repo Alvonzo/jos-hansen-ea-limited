@@ -133,5 +133,10 @@ class ReportCustomerStatement(models.AbstractModel):
             if not invoice_data:
                 partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
             invoice_data = sorted(invoice_data, key=lambda i: i['due_date'])
+            total_residual = 0
+            for invoice in sorted(invoice_data, key=lambda i: i['due_date']):
+                total_residual += invoice['debit']
+                total_residual -= invoice['credit']
+                invoice['running_bal'] = total_residual
             partner_dict[partner].update({'invoice_data': invoice_data, 'period_data': period_data})
         return {'docs': partner_dict}
