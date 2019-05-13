@@ -60,7 +60,7 @@ class ReportCustomerStatement(models.AbstractModel):
             running_bal = 0
             period_month = [period['month'] for period in period_data]
             min_period = min([period['date'] for period in period_data])
-            payments = self.env['account.payment'].search([('partner_id', '=', partner.id), ('state', '=', 'posted'), ('has_invoices','=',False), ('payment_type', '=', 'inbound')])
+            payments = self.env['account.payment'].search([('partner_id', '=', partner.id), ('state', '=', 'posted'), ('payment_type', '=', 'inbound')])
             for invoice in invoices.filtered(lambda x:x.residual > 0):
                 payment_amount = sum(payment.amount for payment in invoice.payment_ids)
                 invoice_month = self.get_invoice_month(invoice, order_field)
@@ -100,7 +100,7 @@ class ReportCustomerStatement(models.AbstractModel):
                             period['amount'] += invoice.residual
                         elif invoice.type == 'out_refund':
                             period['amount'] -= invoice.residual
-            for pay in payments:
+            for pay in payments.filtered(lambda x:len(x.invoice_ids) == 0):
                 running_bal -= pay.amount
                 invoice_month = datetime.strptime(str(pay.payment_date), '%Y-%m-%d').month
                 invoice_data.append({
