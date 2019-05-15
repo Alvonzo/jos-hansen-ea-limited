@@ -2,7 +2,7 @@
 <odoo>
     <template id="report_partner_stmt">
         <t t-call="web.external_layout">
-            <div class="page">
+            <div class="page" style="font-size:14px">
                 <div class="oe_structure"/>
                 <div class="text-center">
                 <h2>Statement of Account</h2></div>
@@ -15,7 +15,7 @@
                         t-options='{"widget": "contact", "fields": ["address", "name"], "no_marker": True}'/></td>
                     <td border="0" >
                     <span><strong>As of <t t-esc="docs[partner]['as_of']" ></t></strong></span><br/>
-                    <span><strong>Credit Term </strong><t t-esc="docs[partner]['payment_term']" ></t></span>
+                    <span><strong>Credit Term </strong><t t-esc="docs[partner]['payment_term']"></t></span>
                     </td>
                     </tr>
                 </table>
@@ -27,6 +27,7 @@
                         <thead>
                             <tr>
                                 <th class="text-left">Description</th>
+                                <!-- <th class="text-left">Invoice Date</th> -->
                                 <th class="text-right">Due Date</th>
                                 <th class="text-right">Invoice #</th>
                                 <!-- <th class="text-right">Invoice Amt.</th>
@@ -41,6 +42,7 @@
                             <t t-foreach="docs[partner]['invoice_data']" t-as="invoice_data">
                             <tr>
                             <td class="text-left"><span t-esc="invoice_data['description']"/></td>
+                            <!-- <td class="text-left"><span t-esc="invoice_data['']"/></td> -->
                             <td class="text-right"><span t-esc="invoice_data['due_date']"/></td>
                             <td class="text-right"><span t-esc="invoice_data['invoice_no']"/></td>
                             <!-- <td class="text-right"><span t-esc="invoice_data['invoice_amount']"/></td>
@@ -67,7 +69,7 @@
                     <table class="table table-bordered mt64" border="1">
                         <tr>
                             <t t-foreach="docs[partner]['period_data']" t-as="period">
-                                <td class="text-center"><strong><span t-esc="period['date']"/></strong></td>
+                                <td class="text-center"><strong><span t-esc="period['period']"/></strong></td>
                             </t>
                         </tr>
                         <tr>

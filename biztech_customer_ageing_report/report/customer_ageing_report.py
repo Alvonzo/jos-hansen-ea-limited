@@ -18,17 +18,18 @@ class ReportCustomerStatement(models.AbstractModel):
             return datetime.strptime(str(invoice.date_invoice), '%Y-%m-%d').month
         return False
 
-    def create_period_dict(self, aged_month, period_data):
+    def create_period_dict(self, period_data):
         period_date = False
         current_year = date.today().year
-        for period in range(0,5):
-            month_range = calendar.monthrange(current_year, aged_month)
-            period_date = date.today().replace(day=month_range[1],month=aged_month,year=current_year)
-            period_data.append({'month': aged_month, 'date': period_date.strftime('%d-%m-%Y'), 'amount': 0.0})
-            aged_month = (period_date - relativedelta(months=1)).month
-            if aged_month == 12:
-                current_year -= 1
-        return period_data, period_date.strftime('%d-%m-%Y')
+        current_date = date.today()
+        periods = ['30', '60', '90', '120']
+        previous_period = '0'
+        for period in periods:
+            start_date = current_date - timedelta(days=int(previous_period))
+            end_date = current_date - timedelta(days=int(period))
+            period_data.append({'period': period, 'amount': 0.0, 'start_date': start_date, 'end_date': end_date})
+            previous_period = period
+        return period_data
 
     @api.model
     def _get_report_values(self, docids, data=None):
@@ -46,34 +47,20 @@ class ReportCustomerStatement(models.AbstractModel):
             elif data['aged_by'] == 'invoice_date':
                 order_field = 'date_invoice'
         month_range = calendar.monthrange(date.today().year, data['month'])
+        start_date = date.today().replace(day=1,month=data['month'],year=date.today().year)
         last_date = date.today().replace(day=month_range[1],month=data['month'],year=date.today().year)
         for partner in partners:
             partner_dict.update({partner: {'invoice_data': [], 'as_of': last_date.strftime('%d-%m-%Y'), 'period_data': [], 'total_amt': 0,
              'total_payment': 0, 'total_due': 0, 'payment_term': '', 'no_data': '', 'total_credit': 0.0, 'total_debit': 0.0, 'total_running_bal': 0.0}})
-            # if partner.property_payment_term_id:
-            #     partner_dict[partner]['payment_term'] = partner.property_payment_term_id and partner.property_payment_term_id.name or ''
+           
             invoice_data = []
             domain = [('partner_id', '=', partner.id), ('account_id.internal_type','=', 'receivable'), ('full_reconcile_id', '=', False)]
             domain += [('date_maturity', '<=', last_date)]
-            # invoices = invoice_obj.search(domain, order=order_field)
-            # current_month = last_date.month
-            period_data = [{'month': 'current', 'date': 'Total Outstanding', 'amount': 0.0}]
-            period_data, min_date = self.create_period_dict(data['month'], period_data)
+           
+            period_data = [{'period': '0', 'date': 'Total Outstanding', 'amount': 0.0, 'start_date': start_date, 'end_date': last_date}]
+            period_data = self.create_period_dict(period_data)
             running_bal = 0
-            # period_month = [period['month'] for period in period_data]
-            # min_period = min([period['date'] for period in period_data])
-            # payments = self.env['account.payment'].search([('partner_id', '=', partner.id), ('state', '=', 'posted'), ('payment_type', '=', 'inbound')])
-            # for invoice in invoices.filtered(lambda x:x.residual > 0):
-            #     payment_amount = sum(payment.amount for payment in invoice.payment_ids)
-            #     invoice_month = self.get_invoice_month(invoice, order_field)
-            #     total_amt = total_payment = total_due = 0
-            #     debit = credit = 0
-            #     if invoice.type == 'out_invoice':
-            #         debit = invoice.residual
-            #         running_bal += invoice.residual
-            #     elif invoice.type == 'out_refund':
-            #         credit = invoice.residual
-            #         running_bal -= invoice.residual
+            print("======period_data====",period_data)
             for move in move_line_obj.search(domain, order='date_maturity'):
                 name = ''
                 if move.invoice_id:
@@ -82,6 +69,7 @@ class ReportCustomerStatement(models.AbstractModel):
                     name = move.payment_id.name
                 invoice_data.append({
                     'move_id': move,
+                    'invoice_id':move.date,
                     'description': move.name,
                     'due_date': move.date_maturity,
                     'invoice_no': name,
@@ -93,53 +81,19 @@ class ReportCustomerStatement(models.AbstractModel):
                     'total_debit': round(partner_dict[partner]['total_debit'] + move.debit, 2),
                     'total_credit': round(partner_dict[partner]['total_credit'] + move.credit, 2),
                     'total_running_bal': 0})
-                # for period in period_data:
-                #     if period['month'] == current_month:
-                #         period['date'] = 'Current'
-                #     if invoice_month in period_month and datetime.strptime(str(invoice.date_due), '%Y-%m-%d').year == current_year:
-                #         if period['month'] == invoice_month:
-                #             if invoice.type == 'out_invoice':
-                #                 period['amount'] += invoice.residual
-                #             elif invoice.type == 'out_refund':
-                #                 period['amount'] -= invoice.residual
-                #         if period['month'] == 'current' and invoice_month == current_month:
-                #             period['amount'] = round(running_bal, 2)
-                #     elif period['date'] == min_date:
-                #         if invoice.type == 'out_invoice':
-                #             period['amount'] += invoice.residual
-                #         elif invoice.type == 'out_refund':
-                #             period['amount'] -= invoice.residual
+                for period in period_data:
+                    if period['period'] != '0':
+                        if move.date_maturity <= period['start_date'] and move.date_maturity > period['end_date']:
+                            if move.debit:
+                                period['amount'] += round(move.debit, 2)
+                            elif move.credit:
+                                period['amount'] -= round(move.credit, 2)
+                        if period['period'] == '120' and move.date_maturity <= period['end_date']:
+                            if move.debit:
+                                period['amount'] += round(move.debit, 2)
+                            elif move.credit:
+                                period['amount'] -= round(move.credit, 2)
             
-            # for pay in payments.filtered(lambda x:len(x.invoice_ids) == 0):self.partner_id.property_account_receivable_id.id
-            # self._cr.execute('''select id from account_move_line where id in %s and account_id = %s and full_reconcile_id is null'''%(tuple(payments.mapped('move_line_ids').ids),partner.property_account_receivable_id.id))
-            # moves = self._cr.dictfetchall()
-            # for pay in move_line_obj.browse([line['id'] for line in moves]):
-            #     running_bal -= pay.credit
-            #     invoice_month = datetime.strptime(str(pay.date_maturity), '%Y-%m-%d').month
-            #     invoice_data.append({
-            #         'description': '',
-            #         'due_date': pay.date_maturity,
-            #         'invoice_no': pay.name,
-            #         'credit': round(pay.credit, 2),
-            #         'debit': round(pay.debit, 2),
-            #         'running_bal': round(running_bal, 2),
-            #     })
-            #     # for period in period_data:
-            #     #     if period['month'] == current_month:
-            #     #         period['date'] = 'Current'
-            #     #     if invoice_month in period_month and datetime.strptime(str(pay.date_maturity), '%Y-%m-%d').year == current_year:
-            #     #         if period['month'] == invoice_month:
-            #     #             period['amount'] -= pay.credit
-            #     #         if period['month'] == 'current' and invoice_month == current_month:
-            #     #             period['amount'] = round(running_bal, 2)
-            #     #     elif period['date'] == min_date:
-            #     #         period['amount'] -= pay.credit
-            #     partner_dict[partner].update({
-            #         'total_debit': round(partner_dict[partner]['total_debit'], 2),
-            #         'total_credit': round(partner_dict[partner]['total_credit'] + pay.credit, 2),
-            #         'total_running_bal': round(running_bal, 2)})
-            # if not invoice_data:
-            #     partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
             invoice_data = sorted(invoice_data, key=lambda i: i['due_date'])
             total_residual = 0
             for invoice in invoice_data:
@@ -147,5 +101,13 @@ class ReportCustomerStatement(models.AbstractModel):
                 total_residual -= invoice['credit']
                 invoice['running_bal'] = round(total_residual, 2)
             partner_dict[partner]['total_running_bal'] = round(total_residual, 2)
+            for period in period_data:
+                if period['period'] == '0':
+                    period['period'] = 'Total Outstanding'
+                    period['amount'] = round(total_residual, 2)
+                # if period['period'] == '120':
+                #     if period['period'] == '+120':
+            if not invoice_data:
+                partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
             partner_dict[partner].update({'invoice_data': invoice_data, 'period_data': period_data})
         return {'docs': partner_dict}
