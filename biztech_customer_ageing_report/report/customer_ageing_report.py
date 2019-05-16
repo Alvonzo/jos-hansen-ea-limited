@@ -60,14 +60,14 @@ class ReportCustomerStatement(models.AbstractModel):
             period_data = [{'period': '0', 'date': 'Total Outstanding', 'amount': 0.0, 'start_date': start_date, 'end_date': last_date}]
             period_data = self.create_period_dict(period_data)
             running_bal = 0
-            date_from = fields.Date.from_string(last_date)
-            self._cr.execute('SELECT debit_move_id, credit_move_id FROM account_partial_reconcile where max_date > %s', (date_from,))
-            reconciled_after_date = []
-            for row in self._cr.fetchall():
-                reconciled_after_date += [row[0], row[1]]
-            if reconciled_after_date:
-                domain += [('id', 'in', reconciled_after_date)]
-            print ("\n ==============", move_line_obj.search(domain, order='date_maturity'))
+            # date_from = fields.Date.from_string(last_date)
+            # self._cr.execute('SELECT debit_move_id, credit_move_id FROM account_partial_reconcile where max_date > %s', (date_from,))
+            # reconciled_after_date = []
+            # for row in self._cr.fetchall():
+            #     reconciled_after_date += [row[0], row[1]]
+            # if reconciled_after_date:
+            #     domain += [('id', 'in', reconciled_after_date)]
+            # print ("\n ==============", move_line_obj.search(domain, order='date_maturity'))
             for move in move_line_obj.search(domain, order='date_maturity'):
                 name = ''
                 if move.invoice_id:
