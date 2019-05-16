@@ -60,8 +60,18 @@ class ReportCustomerStatement(models.AbstractModel):
             period_data = [{'period': '0', 'date': 'Total Outstanding', 'amount': 0.0, 'start_date': start_date, 'end_date': last_date}]
             period_data = self.create_period_dict(period_data)
             running_bal = 0
-            print("======period_data====",period_data)
-            for move in move_line_obj.search(domain, order='date_maturity'):
+            move_state = ['draft', 'posted']
+            self._cr.execute('''SELECT l.id
+                    FROM account_move_line AS l, account_account, account_move am
+                    WHERE (l.account_id = account_account.id) AND (l.move_id = am.id)
+                        AND (am.state IN %s)
+                        AND (account_account.internal_type = '%s')
+                        AND ((l.partner_id = %s) OR (l.partner_id IS NULL))
+                        AND (l.date <= '%s')
+                    ORDER BY COALESCE(l.date_maturity, l.date)'''% (tuple(move_state), "receivable", partner.id, last_date))
+            aml_ids = self._cr.fetchall()
+            aml_ids = aml_ids and [x[0] for x in aml_ids] or []
+            for move in move_line_obj.browse(aml_ids):
                 name = ''
                 if move.invoice_id:
                     name = move.invoice_id.number
@@ -105,8 +115,8 @@ class ReportCustomerStatement(models.AbstractModel):
                 if period['period'] == '0':
                     period['period'] = 'Total Outstanding'
                     period['amount'] = round(total_residual, 2)
-                # if period['period'] == '120':
-                #     if period['period'] == '+120':
+                if period['period'] == '120':
+                    period['period'] == '+120':
             if not invoice_data:
                 partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
             partner_dict[partner].update({'invoice_data': invoice_data, 'period_data': period_data})
