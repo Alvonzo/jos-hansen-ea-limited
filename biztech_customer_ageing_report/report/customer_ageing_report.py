@@ -116,7 +116,7 @@ class ReportCustomerStatement(models.AbstractModel):
                     period['period'] = 'Total Outstanding'
                     period['amount'] = round(total_residual, 2)
                 if period['period'] == '120':
-                    period['period'] == '+120':
+                    period['period'] == '+120'
             if not invoice_data:
                 partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
             partner_dict[partner].update({'invoice_data': invoice_data, 'period_data': period_data})
