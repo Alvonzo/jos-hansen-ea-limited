@@ -49,39 +49,26 @@ class ReportCustomerStatement(models.AbstractModel):
         month_range = calendar.monthrange(date.today().year, data['month'])
         start_date = date.today().replace(day=1,month=data['month'],year=date.today().year)
         last_date = date.today().replace(day=month_range[1],month=data['month'],year=date.today().year)
-        reconciliation_clause = '(l.reconciled IS FALSE)'
-        self._cr.execute('SELECT debit_move_id, credit_move_id FROM account_partial_reconcile where max_date > %s', (last_date,))
-        reconciled_after_date = []
-        for row in self._cr.fetchall():
-            reconciled_after_date += [row[0], row[1]]
-        date_from = fields.Date.from_string(last_date)
         for partner in partners:
             partner_dict.update({partner: {'invoice_data': [], 'as_of': last_date.strftime('%d-%m-%Y'), 'period_data': [], 'total_amt': 0,
              'total_payment': 0, 'total_due': 0, 'payment_term': '', 'no_data': '', 'total_credit': 0.0, 'total_debit': 0.0, 'total_running_bal': 0.0}})
            
             invoice_data = []
-            domain = [('partner_id', '=', partner.id), ('account_id.internal_type','=', 'receivable'), ('full_reconcile_id', '=', False)]
+            domain = [('partner_id', '=', partner.id), ('account_id.internal_type','=', 'receivable'), ('reconciled', '=', False)]
             domain += [('date_maturity', '<=', last_date)]
            
             period_data = [{'period': '0', 'date': 'Total Outstanding', 'amount': 0.0, 'start_date': start_date, 'end_date': last_date}]
             period_data = self.create_period_dict(period_data)
             running_bal = 0
-            move_state = ['draft', 'posted']
-            args = (tuple(move_state), 'receivable', partner.id, date_from,)
+            date_from = fields.Date.from_string(last_date)
+            self._cr.execute('SELECT debit_move_id, credit_move_id FROM account_partial_reconcile where max_date > %s', (date_from,))
+            reconciled_after_date = []
+            for row in self._cr.fetchall():
+                reconciled_after_date += [row[0], row[1]]
             if reconciled_after_date:
-                reconciliation_clause = '(l.reconciled IS FALSE OR l.id IN %s)'
-                args += (tuple(reconciled_after_date),)
-            query = '''SELECT l.id
-                    FROM account_move_line AS l, account_account, account_move am
-                    WHERE (l.account_id = account_account.id) AND (l.move_id = am.id)
-                        AND (am.state IN %s)
-                        AND (account_account.internal_type = %s)
-                        AND ((l.partner_id = %s) OR (l.partner_id IS NULL))
-                        AND (l.date <= %s) AND ''' + reconciliation_clause + ''' ORDER BY COALESCE(l.date_maturity, l.date)'''
-            self._cr.execute(query, args)
-            aml_ids = self._cr.fetchall()
-            aml_ids = aml_ids and [x[0] for x in aml_ids] or []
-            for move in move_line_obj.browse(aml_ids):
+                domain += [('id', 'in', reconciled_after_date)]
+            print ("\n ==============", move_line_obj.search(domain, order='date_maturity'))
+            for move in move_line_obj.search(domain, order='date_maturity'):
                 name = ''
                 if move.invoice_id:
                     name = move.invoice_id.number
@@ -89,7 +76,6 @@ class ReportCustomerStatement(models.AbstractModel):
                     name = move.payment_id.name
                 invoice_data.append({
                     'move_id': move,
-                    'invoice_id':move.date,
                     'description': move.name,
                     'due_date': move.date_maturity,
                     'invoice_no': name,
@@ -127,6 +113,7 @@ class ReportCustomerStatement(models.AbstractModel):
                     period['amount'] = round(total_residual, 2)
                 if period['period'] == '120':
                     period['period'] == '+120'
+            print ("\n invoice_date===========", invoice_data)
             if not invoice_data:
                 partner_dict[partner]['no_data'] = "There is nothing due with this customer!"
             partner_dict[partner].update({'invoice_data': invoice_data, 'period_data': period_data})
